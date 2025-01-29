@@ -519,9 +519,6 @@ def multiplicative_media_mix_model(
                 fn=custom_priors.get(_COEF_TREND, default_priors[_COEF_TREND]),
             )
         )
-    expo_trend = numpyro.sample(
-        name=_EXPO_TREND, fn=custom_priors.get(_EXPO_TREND, default_priors[_EXPO_TREND])
-    )
 
     # Media coefficients (remained the same)
     with numpyro.plate(
@@ -571,17 +568,27 @@ def multiplicative_media_mix_model(
             **transform_kwargs if transform_kwargs else {},
         ),
     )
+    # For national model's case
+    trend = jnp.arange(data_size)
+
+    media_einsum = "tc, c -> t"
+
+    # TODO(): Add conversion of prior for HalfNormal distribution.
+    if media_data.ndim == 3:  # For geo model's case
+        trend = jnp.expand_dims(trend, axis=-1)
+        seasonality = jnp.expand_dims(seasonality, axis=-1)
+        media_einsum = "tcg, cg -> tg"  # t = time, c = channel, g = geo
 
     # Prediction (multiplicative components)
     # Change: Replace additive combination with multiplication.
     prediction = (
-        (1+intercept)  # Intercept (always positive)
+        (intercept)  # Intercept (always positive)
         * (
-            1 + coef_trend * jnp.arange(data_size)[:, None] ** expo_trend
+            1 + coef_trend * trend
         )  # Trend (scaled multiplicatively)
         * (1 + seasonality)  # Seasonality (as a factor > 0)
         * jnp.exp(
-            jnp.einsum("tc, c -> t", media_transformed, coef_media)
+            jnp.einsum(media_einsum, media_transformed, coef_media)
         )  # Media effect (exponentiated to ensure positivity)
     )
 
@@ -617,12 +624,21 @@ def multiplicative_media_mix_model(
         weekday_series = jnp.exp(
             weekday[jnp.arange(data_size) % 7]
         )  # Exponentiated for positivity
+                # In case of daily data, number of lags should be 13*7.
+        if (
+            transform_function == "carryover"
+            and transform_kwargs
+            and "number_lags" not in transform_kwargs
+        ):
+            transform_kwargs["number_lags"] = 13 * 7
+        elif transform_function == "carryover" and not transform_kwargs:
+            transform_kwargs = {"number_lags": 13 * 7}
         if media_data.ndim == 3:
             weekday_series = jnp.expand_dims(weekday_series, axis=-1)
         prediction *= weekday_series  # Multiply by weekday effect
 
     # Final prediction and target sampling
     # Change: `mu` now represents a product of components rather than a sum.
+    prediction = jnp.nan_to_num(prediction, nan=0.0, neginf=1e-6, posinf=1e6)
     mu = numpyro.deterministic(name="mu", value=prediction)
-    mu = jnp.nan_to_num(mu, nan=0.0, neginf=1e-6, posinf=1e6)
     numpyro.sample(name="target", fn=dist.Normal(loc=mu, scale=sigma), obs=target_data)

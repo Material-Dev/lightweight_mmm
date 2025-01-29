@@ -928,5 +928,16 @@ class LightweightMmmMultTest(parameterized.TestCase):
 
     self.assertEqual(mmm_object, mmm_object)
 
+def test_multiplicative_mmm():
+    national_mmm = lightweight_mmm.LightweightMMM(model_spec="multiplicative")
+    national_mmm.fit(
+        media=jnp.ones((50, 5)),
+        target=jnp.ones(50),
+        media_prior=jnp.ones(5) * 50,
+        extra_features=jnp.ones((50, 2)),
+        number_warmup=2,
+        number_samples=4,
+        number_chains=1)
+
 if __name__ == "__main__":
   absltest.main()

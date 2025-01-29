@@ -288,7 +288,7 @@ class ModelsTest(parameterized.TestCase):
         target = jnp.ones((10, 5))
 
         trace_handler = handlers.trace(
-            handlers.seed(models.multiplicative_media_mix_model, rng_seed=0)
+            handlers.seed(models.media_mix_model, rng_seed=0)
         )
         trace = trace_handler.get_trace(
             media_data=media,
@@ -339,7 +339,7 @@ class ModelsTest(parameterized.TestCase):
         target = jnp.ones((10, 5))
 
         trace_handler = handlers.trace(
-            handlers.seed(models.media_mix_model, rng_seed=0)
+            handlers.seed(models.multiplicative_media_mix_model, rng_seed=0)
         )
         trace = trace_handler.get_trace(
             media_data=media,
@@ -362,6 +362,80 @@ class ModelsTest(parameterized.TestCase):
         self.assertIsInstance(used_distribution, dist.Kumaraswamy)
         self.assertEqual(used_distribution.concentration0, expected_value2)
         self.assertEqual(used_distribution.concentration1, expected_value1)
+
+    def test_multiplicative_geo_in_mcmc(self):
+
+        media_shape=(10, 7, 5)
+        extra_features_shape=()
+        target_shape=(10, 5)
+        total_costs_shape=(7, 1)
+        media = jnp.ones(media_shape)
+        extra_features = (
+            None if not extra_features_shape else jnp.ones(extra_features_shape)
+        )
+        costs_prior = jnp.ones(total_costs_shape)
+        target = jnp.ones(target_shape)
+        rng_key = jax.random.PRNGKey(0)
+        kernel = numpyro.infer.NUTS(
+            model=models.multiplicative_media_mix_model,
+            target_accept_prob=0.85,
+            init_strategy=numpyro.infer.init_to_median,
+        )
+
+        mcmc = numpyro.infer.MCMC(
+            sampler=kernel,
+            num_warmup=10,
+            num_samples=5,
+            num_chains=2,
+        )
+        mcmc.run(
+            rng_key=rng_key,
+            media_data=jnp.array(media),
+            extra_features=extra_features,
+            target_data=jnp.array(target),
+            media_prior=jnp.array(costs_prior),
+            degrees_seasonality=2,
+            frequency=52,
+            transform_function=models.transform_adstock,
+            weekday_seasonality=False,
+            custom_priors={},
+        )
+
+    def test_multiplicative_in_mcmc(self):
+
+        
+        media=jnp.ones((50, 5))
+        target=jnp.ones(50)
+        media_prior=jnp.ones(5) * 50
+        extra_features=jnp.ones((50, 2))
+        number_warmup=2
+        number_samples=4
+
+        rng_key = jax.random.PRNGKey(0)
+        kernel = numpyro.infer.NUTS(
+            model=models.multiplicative_media_mix_model,
+            target_accept_prob=0.85,
+            init_strategy=numpyro.infer.init_to_median,
+        )
+
+        mcmc = numpyro.infer.MCMC(
+            sampler=kernel,
+            num_warmup=number_warmup,
+            num_samples=number_samples,
+            num_chains=2,
+        )
+        mcmc.run(
+            rng_key=rng_key,
+            media_data=media,
+            extra_features=extra_features,
+            target_data=target,
+            media_prior=media_prior,
+            degrees_seasonality=2,
+            frequency=52,
+            transform_function=models.transform_adstock,
+            weekday_seasonality=False,
+            custom_priors={},
+        )
 
 
 if __name__ == "__main__":

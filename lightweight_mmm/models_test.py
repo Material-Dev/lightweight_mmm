@@ -415,7 +415,7 @@ class ModelsTest(parameterized.TestCase):
         kernel = numpyro.infer.NUTS(
             model=models.multiplicative_media_mix_model,
             target_accept_prob=0.85,
-            init_strategy=numpyro.infer.init_to_median,
+            #init_strategy=numpyro.infer.init_to_median,
         )
 
         mcmc = numpyro.infer.MCMC(

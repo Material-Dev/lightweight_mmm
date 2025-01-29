@@ -21,6 +21,7 @@ from absl.testing import parameterized
 import jax.numpy as jnp
 import numpy as np
 import numpyro.distributions as dist
+import numpyro.infer
 import pandas as pd
 
 from lightweight_mmm import lightweight_mmm
@@ -490,7 +491,9 @@ class LightweightMmmMultTest(parameterized.TestCase):
         extra_features=jnp.ones((50, 2)),
         number_warmup=2,
         number_samples=4,
-        number_chains=1)
+        number_chains=1,
+        init_strategy=numpyro.infer.init_to_uniform
+        )
     cls.geo_mmm = lightweight_mmm.LightweightMMM(model_spec="multiplicative")
     cls.geo_mmm.fit(
         media=jnp.ones((50, 5, 3)),
@@ -499,7 +502,9 @@ class LightweightMmmMultTest(parameterized.TestCase):
         extra_features=jnp.ones((50, 2, 3)),
         number_warmup=2,
         number_samples=4,
-        number_chains=1)
+        number_chains=1,
+        init_strategy=numpyro.infer.init_to_uniform
+        )
 
   @parameterized.named_parameters([
       dict(
@@ -937,7 +942,9 @@ def test_multiplicative_mmm():
         extra_features=jnp.ones((50, 2)),
         number_warmup=2,
         number_samples=4,
-        number_chains=1)
+        number_chains=1,
+        init_strategy=numpyro.infer.init_to_uniform
+        )
 
 if __name__ == "__main__":
   absltest.main()
